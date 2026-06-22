@@ -386,6 +386,6 @@ MIT License — see [LICENSE](LICENSE) for details.
 Made for the blue team. Built to think like the red team.
 
 For access to the complete source-code of this project, reach out to me on Telegram:
-https://t.me/CyberSenal_bot
+https://t.me/@xn0r1
 
 </div>
