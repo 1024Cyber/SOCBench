@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SOC Lab — Attack Simulation Suite</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<style>
+/* ── CSS Variables ─────────────────────────────────────────────────── */
+:root[data-theme="dark"] {
+  --bg:        #0d1117; --bg2: #161b22; --bg3: #1c2330;
+  --border:    #30363d; --border2: #21262d;
+  --text:      #e6edf3; --text2: #8b949e; --text3: #6e7681;
+  --accent:    #f78166; --accent2: #79c0ff; --accent3: #56d364;
+  --warn:      #e3b341; --danger: #f85149;
+  --input-bg:  #0d1117; --log-bg: #0a0e13;
+  --btn-ghost: rgba(255,255,255,0.05);
+  --card-hover:rgba(247,129,102,0.06);
+  --sel-glow:  rgba(86,211,100,0.15);
+}
+:root[data-theme="light"] {
+  --bg:        #f6f8fa; --bg2: #ffffff; --bg3: #f0f2f5;
+  --border:    #d0d7de; --border2: #e8ebef;
+  --text:      #1f2328; --text2: #57606a; --text3: #8c959f;
+  --accent:    #cf222e; --accent2: #0969da; --accent3: #1a7f37;
+  --warn:      #9a6700; --danger: #cf222e;
+  --input-bg:  #ffffff; --log-bg: #f0f2f5;
+  --btn-ghost: rgba(0,0,0,0.05);
+  --card-hover:rgba(207,34,46,0.04);
+  --sel-glow:  rgba(26,127,55,0.12);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);
+     height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── TOPBAR ─────────────────────────────────────────────────────────── */
+.topbar{display:flex;align-items:center;gap:10px;padding:0 16px;height:52px;
+        background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
+.logo{font-weight:800;font-size:15px;letter-spacing:.06em;color:var(--accent);
+      text-transform:uppercase;flex-shrink:0}
+.logo span{color:var(--text2);font-weight:400}
+.iface-area{display:flex;align-items:center;gap:7px;margin-left:6px}
+.iface-area label{font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace}
+.iface-area select{background:var(--input-bg);border:1px solid var(--border);
+  color:var(--text);padding:4px 9px;border-radius:6px;font-size:12px;
+  font-family:'JetBrains Mono',monospace;outline:none}
+.iface-area select:disabled{opacity:.5;cursor:not-allowed}
+#lock-btn{padding:4px 13px;font-size:11px;border-radius:6px;
+  border:1px solid var(--accent3);background:transparent;color:var(--accent3);
+  cursor:pointer;font-family:'JetBrains Mono',monospace;transition:all .2s}
+#lock-btn:hover:not(:disabled){background:var(--accent3);color:var(--bg)}
+#lock-btn:disabled{opacity:.35;cursor:not-allowed}
+.locked-badge{display:none;font-size:11px;font-family:'JetBrains Mono',monospace;
+  color:var(--accent3);background:rgba(86,211,100,.1);
+  border:1px solid rgba(86,211,100,.3);padding:3px 10px;border-radius:20px}
+.spacer{flex:1}
+.tbtn{padding:5px 13px;border-radius:6px;border:1px solid var(--border);
+  background:transparent;color:var(--text2);font-size:12px;cursor:pointer;
+  font-family:'Syne',sans-serif;transition:all .2s}
+.tbtn:hover{background:var(--btn-ghost);color:var(--text)}
+.theme-btn{width:34px;height:34px;border-radius:7px;border:1px solid var(--border);
+  background:transparent;color:var(--text2);cursor:pointer;display:flex;
+  align-items:center;justify-content:center;font-size:15px;transition:all .2s}
+.theme-btn:hover{background:var(--btn-ghost);color:var(--text)}
+
+/* ── LAYOUT ─────────────────────────────────────────────────────────── */
+.main{display:grid;grid-template-columns:268px 1fr 330px;flex:1;overflow:hidden}
+.panel{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden}
+.panel:last-child{border-right:none}
+.ph{padding:10px 14px;background:var(--bg2);border-bottom:1px solid var(--border);
+    display:flex;align-items:center;gap:8px;flex-shrink:0}
+.ph h3{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text2)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--text3);flex-shrink:0}
+.dot.g{background:var(--accent3);box-shadow:0 0 6px var(--accent3)}
+.dot.o{background:var(--warn);box-shadow:0 0 6px var(--warn)}
+.dot.r{background:var(--danger);box-shadow:0 0 6px var(--danger)}
+.dot.b{background:var(--accent2);box-shadow:0 0 6px var(--accent2)}
+.badge{display:none;font-size:10px;font-family:'JetBrains Mono',monospace;
+  padding:2px 8px;border-radius:20px;margin-left:auto}
+.badge.scanning{color:var(--accent3);background:rgba(86,211,100,.1);
+  border:1px solid rgba(86,211,100,.3);animation:pulse 1s infinite}
+.badge.running{color:var(--danger);background:rgba(248,81,73,.1);
+  border:1px solid rgba(248,81,73,.3);animation:pulse 1s infinite}
+.badge.show{display:inline-block}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+.pb{flex:1;overflow-y:auto;padding:10px}
+.pb::-webkit-scrollbar{width:3px}
+.pb::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* ── LEFT: TARGETS ───────────────────────────────────────────────────── */
+.scan-ctrl{padding:10px 12px;border-bottom:1px solid var(--border2);flex-shrink:0}
+.scan-row{display:flex;gap:6px;margin-bottom:6px}
+#scan-btn{flex:1;padding:7px;border-radius:7px;border:1px solid var(--accent3);
+  background:rgba(86,211,100,.07);color:var(--accent3);font-size:11px;font-weight:600;
+  cursor:pointer;font-family:'JetBrains Mono',monospace;transition:all .2s}
+#scan-btn:hover:not(:disabled){background:var(--accent3);color:var(--bg)}
+#scan-btn:disabled{opacity:.35;cursor:not-allowed}
+#stop-scan{padding:7px 11px;border-radius:7px;border:1px solid var(--danger);
+  background:transparent;color:var(--danger);font-size:11px;cursor:pointer;
+  font-family:'JetBrains Mono',monospace;transition:all .2s}
+#stop-scan:hover:not(:disabled){background:var(--danger);color:#fff}
+#stop-scan:disabled{opacity:.2;cursor:not-allowed}
+.scan-status{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--text3)}
+.sel-summary{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--accent2);
+  margin-top:3px;min-height:14px}
+
+.tgt-list{display:flex;flex-direction:column;gap:3px}
+.tgt-item{padding:8px 11px;border-radius:7px;border:1px solid var(--border2);
+  background:var(--bg3);cursor:pointer;transition:all .15s;position:relative;
+  user-select:none}
+.tgt-item:hover{border-color:var(--accent2)}
+.tgt-item.sel{border-color:var(--accent2);background:rgba(121,192,255,.07)}
+.tgt-item.sel::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+  background:var(--accent2);border-radius:7px 0 0 7px}
+.tgt-ip{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:var(--text)}
+.tgt-mac{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text3);margin-top:2px}
+.tgt-host{font-size:9px;color:var(--accent2);margin-top:1px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sel-check{position:absolute;right:8px;top:50%;transform:translateY(-50%);
+  font-size:12px;color:var(--accent2);display:none}
+.tgt-item.sel .sel-check{display:block}
+
+.empty-hint{text-align:center;padding:36px 14px;color:var(--text3);
+  font-size:11px;line-height:1.9}
+.empty-hint .ei{font-size:26px;margin-bottom:8px}
+
+/* ── MIDDLE: ATTACK PANEL ────────────────────────────────────────────── */
+.cat-tabs{display:flex;flex-wrap:wrap;gap:4px;padding:10px 12px;
+  border-bottom:1px solid var(--border2);flex-shrink:0}
+.ctab{padding:3px 10px;border-radius:20px;border:1px solid var(--border);
+  background:transparent;color:var(--text2);font-size:10px;cursor:pointer;
+  font-family:'Syne',sans-serif;font-weight:600;transition:all .15s}
+.ctab:hover{background:var(--btn-ghost);color:var(--text)}
+.ctab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+.atk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+  gap:7px;padding:10px 12px;flex-shrink:0;
+  border-bottom:1px solid var(--border2);max-height:260px;overflow-y:auto}
+.atk-grid::-webkit-scrollbar{width:3px}
+.atk-grid::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+.acard{padding:11px 9px;border-radius:9px;border:1px solid var(--border);
+  background:var(--bg3);cursor:pointer;transition:all .15s;text-align:center}
+.acard:hover{border-color:var(--accent);background:var(--card-hover)}
+.acard.active{border-color:var(--accent);background:rgba(247,129,102,.09)}
+.aicon{font-size:20px;margin-bottom:5px}
+.aname{font-size:10px;font-weight:700;color:var(--text);text-transform:uppercase;
+  letter-spacing:.04em;line-height:1.3}
+.acat{font-size:9px;color:var(--text3);margin-top:2px;font-family:'JetBrains Mono',monospace}
+
+/* ── CONFIG FORM ─────────────────────────────────────────────────────── */
+.cfg{flex:1;overflow-y:auto;padding:14px}
+.cfg::-webkit-scrollbar{width:3px}
+.cfg::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.cfg-title{font-size:15px;font-weight:800;color:var(--text);margin-bottom:3px}
+.cfg-desc{font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.6}
+
+/* targets tray */
+.tgt-tray{margin-bottom:12px}
+.tray-label{font-size:10px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.08em;color:var(--text3);font-family:'JetBrains Mono',monospace;margin-bottom:5px}
+.tray-chips{display:flex;flex-wrap:wrap;gap:5px;min-height:28px;
+  padding:6px 8px;border-radius:7px;border:1px solid var(--border2);
+  background:var(--bg3)}
+.tray-empty{font-size:11px;color:var(--danger);font-family:'JetBrains Mono',monospace;
+  display:flex;align-items:center;gap:5px}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;
+  border-radius:20px;background:rgba(121,192,255,.12);
+  border:1px solid rgba(121,192,255,.3);font-family:'JetBrains Mono',monospace;
+  font-size:11px;color:var(--accent2)}
+.chip-rm{cursor:pointer;color:var(--text3);font-size:13px;line-height:1;
+  transition:color .15s}
+.chip-rm:hover{color:var(--danger)}
+
+.fg{margin-bottom:10px}
+.fg label{display:block;font-size:10px;font-weight:600;color:var(--text2);
+  text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;
+  font-family:'JetBrains Mono',monospace}
+.fg input,.fg select,.fg textarea{width:100%;padding:7px 11px;
+  background:var(--input-bg);border:1px solid var(--border);border-radius:7px;
+  color:var(--text);font-size:12px;font-family:'JetBrains Mono',monospace;
+  outline:none;transition:border-color .15s}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--accent2)}
+.fg textarea{resize:vertical;min-height:54px}
+.fg .hint{font-size:9px;color:var(--text3);margin-top:3px;font-family:'JetBrains Mono',monospace}
+
+.action-row{display:flex;gap:7px;margin-top:14px}
+#launch-btn{flex:1;padding:10px 18px;border-radius:8px;border:none;
+  background:var(--accent);color:#fff;font-size:12px;font-weight:700;
+  letter-spacing:.05em;cursor:pointer;font-family:'Syne',sans-serif;
+  transition:all .2s;text-transform:uppercase}
+#launch-btn:hover:not(:disabled){background:#ff9580;
+  box-shadow:0 4px 16px rgba(247,129,102,.35)}
+#launch-btn:disabled{opacity:.3;cursor:not-allowed}
+#stop-atk{padding:10px 18px;border-radius:8px;border:1px solid var(--danger);
+  background:transparent;color:var(--danger);font-size:12px;font-weight:700;
+  cursor:pointer;font-family:'Syne',sans-serif;transition:all .2s;text-transform:uppercase}
+#stop-atk:hover:not(:disabled){background:var(--danger);color:#fff;
+  box-shadow:0 4px 16px rgba(248,81,73,.35)}
+#stop-atk:disabled{opacity:.2;cursor:not-allowed}
+
+.pcap-box{display:none;margin-top:12px;padding:11px;border-radius:8px;
+  border:1px solid var(--border2);background:var(--bg3)}
+.pcap-box.show{display:block}
+.plabel{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--text3);font-family:'JetBrains Mono',monospace;margin-bottom:4px}
+.ppath{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent3);
+  word-break:break-all;margin-bottom:8px}
+.ws-cmd{font-family:'JetBrains Mono',monospace;font-size:10px;
+  background:var(--bg);border:1px solid var(--border2);border-radius:5px;
+  padding:7px 9px;color:var(--accent2);word-break:break-all;cursor:pointer;
+  transition:border-color .15s;position:relative;padding-right:68px}
+.ws-cmd:hover{border-color:var(--accent2)}
+.ws-cmd::after{content:"click to copy";position:absolute;right:7px;top:50%;
+  transform:translateY(-50%);font-size:8px;color:var(--text3);text-transform:uppercase}
+.ws-copied::after{content:"copied!";color:var(--accent3)}
+
+/* ── RIGHT: LOG ───────────────────────────────────────────────────────── */
+.log-panel{background:var(--log-bg)}
+.log-ctrl{display:flex;gap:5px;padding:7px 10px;border-bottom:1px solid var(--border2);flex-shrink:0}
+.lf-btn{padding:2px 9px;border-radius:20px;border:1px solid var(--border);
+  background:transparent;color:var(--text3);font-size:9px;cursor:pointer;
+  font-family:'JetBrains Mono',monospace;transition:all .15s}
+.lf-btn.active{background:var(--accent2);border-color:var(--accent2);color:var(--bg)}
+.clr-btn{margin-left:auto;padding:2px 9px;border-radius:20px;border:1px solid var(--border);
+  background:transparent;color:var(--text3);font-size:9px;cursor:pointer;
+  font-family:'JetBrains Mono',monospace;transition:all .15s}
+.clr-btn:hover{border-color:var(--danger);color:var(--danger)}
+.log-body{flex:1;overflow-y:auto;padding:7px 9px;font-family:'JetBrains Mono',monospace;
+  font-size:11px;line-height:1.75}
+.log-body::-webkit-scrollbar{width:3px}
+.log-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.ll{display:flex;gap:7px;padding:1px 0;animation:fi .18s ease}
+@keyframes fi{from{opacity:0;transform:translateX(3px)}to{opacity:1;transform:none}}
+.lts{color:var(--text3);flex-shrink:0;font-size:10px;padding-top:1px}
+.lm{flex:1;word-break:break-word}
+.ll.info    .lm{color:var(--text2)}
+.ll.success .lm{color:var(--accent3)}
+.ll.warn    .lm{color:var(--warn)}
+.ll.error   .lm{color:var(--danger)}
+.ll.system  .lm{color:var(--accent);font-weight:600}
+
+/* ── MODALS ───────────────────────────────────────────────────────────── */
+.ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:100;
+  align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.ov.show{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:13px;
+  padding:26px;max-width:540px;width:90%;max-height:82vh;overflow-y:auto}
+.modal h2{font-size:17px;font-weight:800;color:var(--text);margin-bottom:12px}
+.modal p{font-size:12px;color:var(--text2);line-height:1.7;margin-bottom:8px}
+.modal h4{font-size:11px;font-weight:700;color:var(--accent2);text-transform:uppercase;
+  letter-spacing:.07em;margin:13px 0 5px}
+.modal code{font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--bg3);
+  border:1px solid var(--border);padding:2px 5px;border-radius:4px;color:var(--accent3)}
+.mclose{display:block;margin-top:18px;padding:8px 18px;border-radius:7px;
+  border:1px solid var(--border);background:transparent;color:var(--text2);
+  font-size:12px;cursor:pointer;font-family:'Syne',sans-serif;transition:all .2s}
+.mclose:hover{background:var(--btn-ghost);color:var(--text)}
+
+/* pcap list */
+.pcap-list{margin-top:6px}
+.pcap-file{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent3);
+  padding:3px 0;border-bottom:1px solid var(--border2)}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <div class="logo">SOC<span>BENCH</span></div>
+  <div class="iface-area">
+    <label>IFACE</label>
+    <select id="iface-sel"><option value="">Loading…</option></select>
+    <button id="lock-btn">Lock</button>
+    <span class="locked-badge" id="locked-badge">🔒 <span id="locked-name"></span></span>
+  </div>
+  <div class="spacer"></div>
+  <button class="tbtn" onclick="openModal('pcap-modal')">📁 PCAPs</button>
+  <button class="tbtn" onclick="openModal('help-modal')">Help</button>
+  <button class="tbtn" onclick="openModal('about-modal')">About</button>
+  <button class="theme-btn" id="theme-btn" title="Toggle theme">🌙</button>
+</header>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- LEFT: Targets -->
+  <aside class="panel">
+    <div class="ph">
+      <div class="dot" id="scan-dot"></div>
+      <h3>Network Targets</h3>
+      <span class="badge scanning" id="scan-badge">SCANNING</span>
+    </div>
+    <div class="scan-ctrl">
+      <div class="scan-row">
+        <button id="scan-btn" onclick="startScan()" disabled>⟳ Deep Scan (3-pass)</button>
+        <button id="stop-scan" onclick="stopScan()" disabled>■</button>
+      </div>
+      <div class="scan-status" id="scan-status">Lock an interface to begin</div>
+      <div class="sel-summary" id="sel-summary"></div>
+    </div>
+    <div class="pb">
+      <div class="tgt-list" id="tgt-list">
+        <div class="empty-hint">
+          <div class="ei">🖧</div>
+          Run a scan to discover<br>hosts on the network.<br>
+          <span style="font-size:10px;color:var(--text3)">Click to select · Ctrl+click multi-select</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MIDDLE: Attack Panel -->
+  <section class="panel">
+    <div class="ph">
+      <div class="dot b"></div>
+      <h3>Attack Configuration</h3>
+      <span class="badge running" id="atk-badge">RUNNING</span>
+    </div>
+    <div class="cat-tabs">
+      <button class="ctab active" onclick="filterCat(this,'all')">All</button>
+      <button class="ctab" onclick="filterCat(this,'l2')">Layer 2</button>
+      <button class="ctab" onclick="filterCat(this,'dos')">DoS</button>
+      <button class="ctab" onclick="filterCat(this,'recon')">Recon</button>
+      <button class="ctab" onclick="filterCat(this,'proto')">Protocol</button>
+      <button class="ctab" onclick="filterCat(this,'covert')">Covert</button>
+      <button class="ctab" onclick="filterCat(this,'nmap')">Nmap Advanced</button>
+      <button class="ctab" onclick="filterCat(this,'hping3')">hping3</button>
+    </div>
+    <div class="atk-grid" id="atk-grid"></div>
+    <div class="cfg" id="cfg">
+      <div class="empty-hint" style="padding-top:24px">
+        <div class="ei">⚡</div>
+        Select an attack above<br>to configure and launch
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT: Log -->
+  <aside class="panel log-panel">
+    <div class="ph">
+      <div class="dot" id="log-dot"></div>
+      <h3>Live Log</h3>
+    </div>
+    <div class="log-ctrl">
+      <button class="lf-btn active" onclick="setLF(this,'all')">All</button>
+      <button class="lf-btn" onclick="setLF(this,'success')">✓</button>
+      <button class="lf-btn" onclick="setLF(this,'warn')">!</button>
+      <button class="lf-btn" onclick="setLF(this,'error')">✗</button>
+      <button class="clr-btn" onclick="clearLog()">Clear</button>
+    </div>
+    <div class="log-body" id="log-body"></div>
+  </aside>
+</div>
+
+<!-- MODALS -->
+<div class="ov" id="help-modal">
+  <div class="modal">
+    <h2>📖 Help</h2>
+    <h4>Workflow</h4>
+    <p>1. Select your network interface from the top bar dropdown, then click <strong>Lock</strong>. Restart the app to change.</p>
+    <p>2. Click <strong>Deep Scan</strong> — 3-pass ARP + ICMP sweep discovers all hosts.</p>
+    <p>3. Click one or more hosts in the Target panel to select them. Ctrl+click for multi-select. Selected targets appear as chips in the attack form.</p>
+    <p>4. Select an attack type, configure parameters, then click <strong>Launch Attack</strong>.</p>
+    <p>5. Click <strong>Stop Attack</strong> to end. PCAP is saved to <code>pcap_analysis/</code> automatically.</p>
+    <h4>Button Rules</h4>
+    <p>• <strong>Launch Attack</strong> — greyed until: interface locked + at least one target selected + no scan running.</p>
+    <p>• <strong>Stop Attack</strong> — only active while an attack is running.</p>
+    <p>• <strong>Interface Lock</strong> — greyed once locked. Restart to change.</p>
+    <h4>Multi-Target Attacks</h4>
+    <p>When multiple targets are selected, the attack runs against all selected IPs in sequence. Each IP gets its own thread where supported.</p>
+    <h4>PCAP Files</h4>
+    <p>Saved to <code>./pcap_analysis/attackname_YYYYMMDD_HHMMSS.pcap</code>. View the PCAP list from the top bar button. Run: <code>wireshark -r filename.pcap -Y "filter"</code></p>
+    <button class="mclose" onclick="closeModal('help-modal')">Close</button>
+  </div>
+</div>
+
+<div class="ov" id="about-modal">
+  <div class="modal">
+    <h2> SOCBench by Innocent I.</h2>
+    <p>A Web-based SOC analyst training platform for generating realistic attack traffic in a controlled lab environment.</p>
+    <h4>Attack Coverage</h4>
+    <p><strong>Layer 2:</strong> ARP Spoof · MAC Flood · IP Spoof · RST Injection</p>
+    <p><strong>DoS:</strong> SYN Flood · UDP Flood · ACK Flood · ICMP Flood · Slowloris · Frag Attack</p>
+    <p><strong>Recon:</strong> ICMP Sweep · SYN Scan · OS Fingerprint · ARP Poison Detect · Rogue DHCP Detect</p>
+    <p><strong>Protocol Abuse:</strong> DNS Spoof · LLMNR Poison · NBT-NS Poison · mDNS Poison</p>
+    <p><strong>Covert:</strong> C2 Beacon · ICMP Tunnel · DNS Exfil · Port Knock</p>
+    <p><strong>Nmap Advanced:</strong> Xmas Scan · TCP Connect · NULL Scan · FIN Scan · Decoy Scan · Spoof MAC · Spoof IP · Source Port</p>
+    <p><strong>hping3 Advanced:</strong> ICMP Custom · SYN Custom · Random Source</p>
+    <h4>Stack</h4>
+    <p>Python 3 · Scapy · Flask · Flask-SocketIO · Vanilla JS</p>
+    <h4>⚠ Disclaimer</h4>
+    <p>Authorized lab/training environments only. Do not use against networks you do not own or have explicit written permission to test.</p>
+    <h5> Contact </h5>
+    
+    <p> <a href="https://x.com/1024cyber/" target="_blank" rel="noopener noreferrer"> My Twitter </a> 
+    </p>     
+                             
+    <p> <a href="https://linkedin.com/in/issatx" target="_blank" rel="noopener noreferrer">My Linkedin </a> 
+    </p>  
+    
+    <p> <a href="https://github.com/1024cyber/" target="_blank" rel="noopener noreferrer">My Github </a> 
+    </p>  
+
+    <button class="mclose" onclick="closeModal('about-modal')">Close</button>
+  </div>
+</div>
+
+<div class="ov" id="pcap-modal">
+  <div class="modal">
+    <h2>📁 Saved PCAPs</h2>
+    <p>All captures saved to <code>pcap_analysis/</code> in the app directory.</p>
+    <div class="pcap-list" id="pcap-list"><p style="color:var(--text3);font-size:11px">Loading…</p></div>
+    <button class="mclose" onclick="closeModal('pcap-modal')">Close</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  ATTACK REGISTRY
+// ═══════════════════════════════════════════════════════════════
+const ATTACKS = [
+  // ── Layer 2
+  { id:"arp_spoof",         name:"ARP Spoof",      icon:"🔀", cat:"l2",
+    desc:"Floods the network with gratuitous ARP replies mapping a gateway IP to the attacker MAC, poisoning ARP caches.",
+    filter:"arp.isgratuitous == 1",
+    fields:[
+      {id:"gateway_ip", label:"Gateway IP to Impersonate", ph:"192.168.1.1", hint:"Usually the router IP"},
+    ]},
+  { id:"mac_flood",         name:"MAC Flood",       icon:"🌊", cat:"l2",
+    desc:"Floods the switch CAM table with unique spoofed source MACs, forcing hub mode and enabling passive sniffing.",
+    filter:"(eth.src[0] & 0x02) == 0x02",
+    fields:[
+      {id:"threads", label:"Sender Threads", ph:"6"},
+    ]},
+  { id:"ip_spoof",          name:"IP Spoof",        icon:"🎭", cat:"l2",
+    desc:"Sends packets with spoofed source IPs (random or fixed) toward the target using TCP, UDP, or ICMP.",
+    filter:"ip.dst == {target}",
+    fields:[
+      {id:"spoof_ip", label:"Spoof Source IP (blank=random)", ph:"10.0.0.1", hint:"Leave blank for random per-packet"},
+      {id:"proto",    label:"Protocol", type:"select", opts:["tcp","udp","icmp"]},
+      {id:"threads",  label:"Sender Threads", ph:"4"},
+    ]},
+  { id:"rst_injection",     name:"RST Inject",      icon:"✂", cat:"l2",
+    desc:"Sniffs active TCP connections to/from the target and injects forged RST packets to tear them down.",
+    filter:"tcp.flags.reset == 1",
+    fields:[]},
+
+  // ── DoS
+  { id:"syn_flood",         name:"SYN Flood",       icon:"⚡", cat:"dos",
+    desc:"Sends TCP SYN packets with randomized spoofed source IPs to exhaust the target's half-open connection table.",
+    filter:"tcp.flags.syn==1 && tcp.flags.ack==0",
+    fields:[
+      {id:"target_port", label:"Target Port", ph:"80"},
+      {id:"threads",     label:"Sender Threads", ph:"4"},
+    ]},
+  { id:"udp_flood",         name:"UDP Flood",        icon:"🔥", cat:"dos",
+    desc:"Floods random UDP ports with spoofed-source frames, causing ICMP port-unreachable response storms.",
+    filter:"udp && ip.dst == {target}",
+    fields:[
+      {id:"threads", label:"Sender Threads", ph:"4"},
+    ]},
+  { id:"ack_flood",         name:"ACK Flood",        icon:"🏓", cat:"dos",
+    desc:"Sends a stream of TCP ACK packets with spoofed sources — bypasses naive SYN-only rate limiters.",
+    filter:"tcp.flags.ack==1 && tcp.flags.syn==0",
+    fields:[
+      {id:"target_port", label:"Target Port", ph:"80"},
+      {id:"threads",     label:"Sender Threads", ph:"4"},
+    ]},
+  { id:"icmp_flood",        name:"ICMP Flood",       icon:"💥", cat:"dos",
+    desc:"Rapid ICMP echo requests from randomized spoofed sources to overwhelm the target host.",
+    filter:"icmp.type==8 && ip.dst=={target}",
+    fields:[
+      {id:"threads", label:"Sender Threads", ph:"4"},
+    ]},
+  { id:"frag_attack",       name:"Frag Attack",      icon:"🧩", cat:"dos",
+    desc:"Sends overlapping IP fragments with the same ID, stressing firewall reassembly and IDS stateful tracking.",
+    filter:"ip.flags.mf==1 || ip.frag_offset>0",
+    fields:[
+      {id:"threads", label:"Sender Threads", ph:"2"},
+    ]},
+  { id:"slowloris",         name:"Slowloris",         icon:"🐢", cat:"dos",
+    desc:"Opens many partial HTTP connections and keeps them alive with incomplete headers, exhausting the server's connection pool.",
+    filter:"tcp.dstport=={port} && ip.dst=={target}",
+    fields:[
+      {id:"target_port",  label:"Target HTTP Port", ph:"80"},
+      {id:"num_sockets",  label:"Concurrent Sockets", ph:"200", hint:"Higher = more effective, needs more RAM"},
+      {id:"interval",     label:"Keepalive Interval (s)", ph:"10"},
+    ]},
+
+  // ── Recon
+  { id:"icmp_sweep",        name:"ICMP Sweep",       icon:"📡", cat:"recon",
+    desc:"Parallel Layer-2 ICMP echo sweep across the subnet. Identifies live hosts and guesses OS from TTL.",
+    filter:"icmp.type==8 || icmp.type==0",
+    fields:[
+      {id:"subnet", label:"Subnet (blank=auto-detect)", ph:"192.168.1.0/24"},
+    ]},
+  { id:"syn_scan",          name:"SYN Scan",          icon:"🔬", cat:"recon",
+    desc:"Parallel stealth TCP SYN scan. Sends SYN, reads SYN-ACK for open ports, RSTs immediately without completing handshake.",
+    filter:"tcp.flags.syn==1 && tcp.flags.ack==0",
+    fields:[
+      {id:"port_range", label:"Port Range (start-end)", ph:"1-1024", hint:"e.g. 1-65535 for full scan"},
+    ]},
+  { id:"os_fingerprint",    name:"OS Fingerprint",    icon:"🖥", cat:"recon",
+    desc:"Sends NULL, FIN, XMAS, SYN+FIN and ACK probes. Analyses response flags and TTL to identify the target OS stack.",
+    filter:"tcp && ip.dst=={target}",
+    fields:[
+      {id:"target_port", label:"Probe Port", ph:"80"},
+    ]},
+  { id:"arp_poison_detect", name:"ARP Detect",         icon:"🔍", cat:"recon",
+    desc:"Passive monitor — watches ARP replies and alerts when the same IP is claimed by multiple MACs (active poisoning IOC).",
+    filter:"arp.opcode==2",
+    fields:[]},
+  { id:"rogue_dhcp_detect", name:"Rogue DHCP",         icon:"🚨", cat:"recon",
+    desc:"Passive monitor — listens for DHCPOFFER packets and flags any server not matching your known-good DHCP server IP.",
+    filter:"dhcp.option.dhcp==2",
+    fields:[
+      {id:"known_server", label:"Known-Good DHCP Server IP", ph:"192.168.1.1", hint:"Leave blank to flag ALL offers"},
+    ]},
+
+  // ── Protocol Abuse
+  { id:"dns_spoof",         name:"DNS Spoof",          icon:"☠", cat:"proto",
+    desc:"Races a forged DNS reply against a legitimate server, redirecting the victim's DNS resolution to an attacker IP.",
+    filter:"dns.flags.response==1",
+    fields:[
+      {id:"spoof_ip",   label:"IP to Return in Forged Reply", ph:"192.168.1.99"},
+      {id:"domain",     label:"Domain to Spoof", ph:"updates.corp.local"},
+      {id:"dns_server", label:"Legitimate DNS Server IP", ph:"192.168.1.1"},
+    ]},
+  { id:"llmnr_poison",      name:"LLMNR Poison",       icon:"📶", cat:"proto",
+    desc:"Sends forged LLMNR responses to the multicast group claiming to be a named Windows host (Responder-style).",
+    filter:"udp.port==5355 && dns.flags.response==1",
+    fields:[
+      {id:"spoof_name", label:"Hostname to Claim", ph:"fileserver"},
+      {id:"count",      label:"Responses to Send (0=continuous)", ph:"200"},
+    ]},
+  { id:"nbtns_poison",      name:"NBT-NS Poison",      icon:"🪟", cat:"proto",
+    desc:"Sends forged NetBIOS Name Service responses — redirects NBNS name resolution to attacker IP.",
+    filter:"udp.port==137",
+    fields:[
+      {id:"spoof_name", label:"NetBIOS Name to Claim (≤15 chars)", ph:"FILESERVER"},
+      {id:"count",      label:"Responses to Send (0=continuous)", ph:"200"},
+    ]},
+  { id:"mdns_poison",       name:"mDNS Poison",        icon:"🍎", cat:"proto",
+    desc:"Sends forged mDNS answers with cache-flush bit, claiming a .local name on the multicast group.",
+    filter:"udp.port==5353 && dns.flags.response==1",
+    fields:[
+      {id:"spoof_name", label:".local Name to Claim", ph:"printer.local"},
+      {id:"count",      label:"Responses to Send (0=continuous)", ph:"200"},
+    ]},
+
+  // ── Covert
+  { id:"c2_beacon",         name:"C2 Beacon",          icon:"🛰", cat:"covert",
+    desc:"Simulates a compromised host beaconing home — periodic SYN+data+FIN cycles at configurable intervals with jitter.",
+    filter:"tcp.flags.syn==1 && ip.dst=={target}",
+    fields:[
+      {id:"target_port", label:"C2 Port", ph:"443"},
+      {id:"interval",    label:"Beacon Interval (seconds)", ph:"30"},
+      {id:"jitter",      label:"Jitter ± seconds", ph:"3"},
+    ]},
+  { id:"icmp_tunnel",       name:"ICMP Tunnel",         icon:"🕵", cat:"covert",
+    desc:"Encodes text inside ICMP echo payloads — simulates data exfiltration hidden in ping traffic.",
+    filter:"icmp.type==8 && data.len>8",
+    fields:[
+      {id:"message", label:"Message to Encode in Payload", ph:"SOC-LAB-COVERT-CHANNEL"},
+      {id:"repeat",  label:"Transmission Count", ph:"5"},
+    ]},
+  { id:"dns_exfil",         name:"DNS Exfil",           icon:"📤", cat:"covert",
+    desc:"Base32-encodes data as numbered subdomain labels in DNS queries, simulating DNS tunnelling (dnscat2/iodine).",
+    filter:"dns.flags.response==0",
+    fields:[
+      {id:"domain",    label:"C2 Domain", ph:"exfil.attacker.com"},
+      {id:"message",   label:"Data to Exfiltrate", ph:"CONFIDENTIAL-SOC-LAB-TEST"},
+      {id:"target_ip", label:"DNS Server to Query", ph:"8.8.8.8", hint:"Overrides target — DNS server IP"},
+    ]},
+  { id:"port_knock",        name:"Port Knock",          icon:"🚪", cat:"covert",
+    desc:"Sends a precise SYN sequence to closed ports in order — simulates a port-knocking firewall-unlock attempt.",
+    filter:"tcp.flags.syn==1 && ip.dst=={target}",
+    fields:[
+      {id:"knock_sequence", label:"Port Sequence (comma-separated)", ph:"7000,8000,9000,7001"},
+      {id:"delay",          label:"Delay Between Knocks (s)", ph:"0.5"},
+      {id:"repeat",         label:"Repeat Sequence N times", ph:"3"},
+    ]},
+
+  // ── Nmap Advanced ─────────────────────────────────────────────────────────
+  { id:"nmap_xmas",        name:"Xmas Scan",         icon:"🎄", cat:"nmap",
+    desc:"Sends TCP packets with FIN+URG+PSH flags set ('lit up like a Christmas tree'). Open ports give no response; closed ports reply RST. Bypasses many stateless packet filters.",
+    filter:"tcp.flags==0x029 && ip.dst=={target}",
+    wireshark_extra:"tcp.flags.fin==1 && tcp.flags.urg==1 && tcp.flags.push==1",
+    fields:[
+      {id:"port_range", label:"Port Range", ph:"1-1024", hint:"e.g. 1-65535 for full scan"},
+    ]},
+  { id:"nmap_tcp",         name:"TCP Connect",        icon:"🤝", cat:"nmap",
+    desc:"Full three-way handshake scan (-sT). Noisiest scan type — always logged by the target OS. Used when SYN scan is not possible (no raw socket). Completes ACK then RSTs.",
+    filter:"tcp && ip.dst=={target}",
+    wireshark_extra:"tcp.flags.syn==1 || tcp.flags.ack==1 || tcp.flags.reset==1",
+    fields:[
+      {id:"port_range", label:"Port Range", ph:"1-1024"},
+    ]},
+  { id:"nmap_null",        name:"NULL Scan",          icon:"∅", cat:"nmap",
+    desc:"Sends TCP packets with NO flags set (0x000). Closed ports reply RST; open ports are silent. RFC non-compliant — evades some stateless ACLs. Works well against Unix targets.",
+    filter:"tcp.flags==0x000 && ip.dst=={target}",
+    wireshark_extra:"tcp.flags==0x000",
+    fields:[
+      {id:"port_range", label:"Port Range", ph:"1-1024"},
+    ]},
+  { id:"nmap_fin",         name:"FIN Scan",           icon:"🏁", cat:"nmap",
+    desc:"Sends TCP FIN packets (-sF). Closed ports send RST; open ports are silent. Similar evasion profile to NULL and Xmas. Bypasses non-stateful ACLs that only check SYN.",
+    filter:"tcp.flags==0x001 && ip.dst=={target}",
+    wireshark_extra:"tcp.flags.fin==1 && tcp.flags.syn==0 && tcp.flags.ack==0",
+    fields:[
+      {id:"port_range", label:"Port Range", ph:"1-1024"},
+    ]},
+  { id:"nmap_decoy",       name:"Decoy Scan",         icon:"👥", cat:"nmap",
+    desc:"Sends SYN probes from multiple spoofed IPs alongside the real scanner IP (-D). Makes it hard for defenders to identify the true source. Use RND:N for N random decoys.",
+    filter:"tcp.flags.syn==1 && ip.dst=={target}",
+    wireshark_extra:"tcp.flags.syn==1 && ip.dst=={target}  →  Statistics → Conversations → IPv4",
+    fields:[
+      {id:"port_range", label:"Port Range", ph:"1-1024"},
+      {id:"decoys",     label:"Decoy IPs (comma-sep or RND:N)", ph:"RND:5",
+       hint:"RND:5 = 5 random decoys. Or: 10.0.0.1,10.0.0.2,ME"},
+    ]},
+  { id:"nmap_spoof_mac",   name:"Spoof MAC Scan",     icon:"🏷", cat:"nmap",
+    desc:"Sends SYN probes with a forged Ethernet source MAC (--spoof-mac). Bypasses MAC-based ACLs and generates locally-administered MAC traffic. Use 0 for random, vendor name, or full MAC.",
+    filter:"(eth.src[0] & 0x02)==0x02 && ip.dst=={target}",
+    wireshark_extra:"eth.src == <spoofed_mac>  or  (eth.src[0] & 0x02)==0x02",
+    fields:[
+      {id:"port_range", label:"Port Range", ph:"1-1024"},
+      {id:"spoof_mac",  label:"Spoof MAC (0=random, vendor, or full MAC)", ph:"0",
+       hint:"Examples: 0 | apple | cisco | 00:11:22:33:44:55"},
+    ]},
+  { id:"nmap_spoof_ip",    name:"Spoof IP Scan",      icon:"🕵", cat:"nmap",
+    desc:"Sends SYN probes with a forged source IP (-S). Responses go to the spoofed IP not the scanner — capture locally in Wireshark to see results. Simulates blind spoofed recon.",
+    filter:"tcp.flags.syn==1 && ip.dst=={target}",
+    wireshark_extra:"ip.src == <spoof_ip> && ip.dst=={target} && tcp.flags.syn==1",
+    fields:[
+      {id:"port_range", label:"Port Range", ph:"1-1024"},
+      {id:"spoof_ip",   label:"Spoof Source IP (blank=random)", ph:"",
+       hint:"Leave blank for random. Responses go to this IP, not you."},
+    ]},
+  { id:"nmap_source_port", name:"Source Port Scan",   icon:"🎯", cat:"nmap",
+    desc:"Sends SYN probes from a fixed source port (--source-port / -g). Exploits firewalls that trust traffic from well-known ports like 53 (DNS) or 80 (HTTP).",
+    filter:"tcp.flags.syn==1 && tcp.srcport=={source_port} && ip.dst=={target}",
+    wireshark_extra:"tcp.srcport==53 && ip.dst=={target}",
+    fields:[
+      {id:"port_range",  label:"Port Range to Scan", ph:"1-1024"},
+      {id:"source_port", label:"Fixed Source Port", ph:"53",
+       hint:"Common bypass values: 53 (DNS), 80 (HTTP), 443 (HTTPS), 20 (FTP-data)"},
+    ]},
+
+  // ── hping3 Advanced ───────────────────────────────────────────────────────
+  { id:"hping3_icmp",      name:"ICMP Custom",        icon:"📨", cat:"hping3",
+    desc:"Crafts ICMP packets with fully customizable type, code, payload size, TTL, and ID. Simulates a wide variety of ICMP probe patterns including redirects, unreachables, and timestamp probes.",
+    filter:"icmp && ip.dst=={target}",
+    wireshark_extra:"icmp.type=={icmp_type} && icmp.code=={icmp_code} && ip.dst=={target}",
+    fields:[
+      {id:"icmp_type",    label:"ICMP Type", ph:"8",
+       hint:"0=Reply 3=Unreach 5=Redirect 8=EchoReq 11=TimeExceed 13=Timestamp"},
+      {id:"icmp_code",    label:"ICMP Code", ph:"0",
+       hint:"Type 3 codes: 0=NetUnreach 1=HostUnreach 3=PortUnreach 4=FragNeeded"},
+      {id:"payload_size", label:"Payload Size (bytes)", ph:"64"},
+      {id:"ttl",          label:"TTL", ph:"64"},
+      {id:"count",        label:"Packet Count", ph:"100"},
+      {id:"interval",     label:"Interval (s)", ph:"0.1"},
+    ]},
+  { id:"hping3_syn",       name:"SYN Custom",         icon:"🔧", cat:"hping3",
+    desc:"Crafts TCP SYN packets with full control over window size, TTL, flags, IP ID, sequence number, source port, and TCP timestamp option. Tests IDS rules and fingerprints stack behavior.",
+    filter:"tcp.flags.syn==1 && ip.dst=={target}",
+    wireshark_extra:"tcp.window_size_value=={window} && ip.dst=={target} && ip.ttl=={ttl}",
+    fields:[
+      {id:"target_port",    label:"Target Port", ph:"80"},
+      {id:"source_port",    label:"Source Port (random or fixed)", ph:"random"},
+      {id:"flags",          label:"TCP Flags", ph:"S",
+       hint:"S=SYN A=ACK F=FIN R=RST P=PSH U=URG  Combine: SA=SYN-ACK"},
+      {id:"window_size",    label:"TCP Window Size", ph:"65535"},
+      {id:"ttl",            label:"IP TTL", ph:"64"},
+      {id:"tcp_timestamp",  label:"Include TCP Timestamp Option (yes/no)", ph:"yes"},
+      {id:"count",          label:"Packet Count", ph:"100"},
+      {id:"interval",       label:"Interval (s)", ph:"0.1"},
+    ]},
+  { id:"hping3_rand_source", name:"Rand Source",      icon:"🎲", cat:"hping3",
+    desc:"Sends TCP/UDP/ICMP packets with a fully randomized source IP per packet — the traffic pattern an analyst sees from spoofed-source recon or low-rate flood. Configurable rate and protocol.",
+    filter:"ip.dst=={target}",
+    wireshark_extra:"ip.dst=={target}  →  Statistics → Conversations → IPv4 (many unique sources)",
+    fields:[
+      {id:"target_port", label:"Target Port", ph:"80"},
+      {id:"proto",       label:"Protocol", type:"select", opts:["tcp","udp","icmp"]},
+      {id:"flags",       label:"TCP Flags (if TCP)", ph:"S"},
+      {id:"count",       label:"Packet Count", ph:"500"},
+      {id:"interval",    label:"Interval per thread (s)", ph:"0.05",
+       hint:"Lower = faster. 0.01 = ~100pkt/s per thread"},
+      {id:"threads",     label:"Sender Threads", ph:"2"},
+    ]},
+];
+
+// ═══════════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════════
+let selectedTargets = [];   // array of {ip, mac, hostname}
+let selectedAttack  = null;
+let ifaceLocked     = false;
+let scanRunning     = false;
+let atkRunning      = false;
+let logFilter       = "all";
+let currentCat      = "all";
+
+// ═══════════════════════════════════════════════════════════════
+//  SOCKET
+// ═══════════════════════════════════════════════════════════════
+const socket = io();
+socket.on("connect",    () => addLog("system","Connected to SOC Lab server"));
+socket.on("disconnect", () => addLog("error", "Disconnected from server"));
+socket.on("log",        d  => addLog(d.level, d.msg, d.ts));
+
+socket.on("scan_start", () => {
+  scanRunning = true;
+  document.getElementById("scan-badge").classList.add("show");
+  document.getElementById("scan-dot").className = "dot g";
+  document.getElementById("scan-status").textContent = "Scanning…";
+  document.getElementById("stop-scan").disabled = false;
+  document.getElementById("scan-btn").disabled  = true;
+  syncLaunchBtn();
+});
+
+socket.on("scan_done", d => {
+  scanRunning = false;
+  document.getElementById("scan-badge").classList.remove("show");
+  document.getElementById("scan-dot").className = d.targets.length ? "dot g" : "dot";
+  document.getElementById("stop-scan").disabled = true;
+  document.getElementById("scan-btn").disabled  = false;
+  document.getElementById("scan-status").textContent =
+    `${d.targets.length} host(s) found — click to select`;
+  renderTargets(d.targets);
+  syncLaunchBtn();
+});
+
+socket.on("atk_start", d => {
+  atkRunning = true;
+  document.getElementById("atk-badge").classList.add("show");
+  document.getElementById("log-dot").className = "dot r";
+  const sb = document.getElementById("stop-atk");
+  if (sb) sb.disabled = false;
+  const lb = document.getElementById("launch-btn");
+  if (lb) lb.disabled = true;
+  const pb = document.getElementById("pcap-box");
+  if (pb) {
+    pb.classList.add("show");
+    const pp = document.getElementById("pcap-path");
+    if (pp) pp.textContent = `pcap_analysis/${d.pcap_basename}`;
+  }
+});
+
+socket.on("atk_done", () => {
+  atkRunning = false;
+  document.getElementById("atk-badge").classList.remove("show");
+  document.getElementById("log-dot").className = "dot b";
+  const sb = document.getElementById("stop-atk");
+  if (sb) sb.disabled = true;
+  syncLaunchBtn();
+});
+
+socket.on("wireshark_cmd", d => {
+  const el = document.getElementById("ws-cmd-text");
+  if (el) {
+    el.textContent = d.cmd;
+    el.onclick = () => {
+      navigator.clipboard.writeText(d.cmd);
+      el.classList.add("ws-copied");
+      setTimeout(() => el.classList.remove("ws-copied"), 2000);
+    };
+  }
+  addLog("system", `📋 Wireshark: ${d.cmd}`);
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  INTERFACE
+// ═══════════════════════════════════════════════════════════════
+async function loadIfaces() {
+  const res    = await fetch("/api/interfaces");
+  const ifaces = await res.json();
+  const sel    = document.getElementById("iface-sel");
+  sel.innerHTML = ifaces.length
+    ? ifaces.map(i => `<option value="${i}">${i}</option>`).join("")
+    : '<option value="">No interfaces found</option>';
+}
+
+async function lockIface() {
+  const iface = document.getElementById("iface-sel").value;
+  if (!iface) { addLog("error","Select an interface first"); return; }
+  const res  = await fetch("/api/set_iface", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({iface})
+  });
+  const data = await res.json();
+  if (data.ok) {
+    ifaceLocked = true;
+    document.getElementById("iface-sel").disabled    = true;
+    document.getElementById("lock-btn").disabled     = true;
+    document.getElementById("locked-badge").style.display = "inline-flex";
+    document.getElementById("locked-name").textContent = iface;
+    document.getElementById("scan-btn").disabled     = false;
+    document.getElementById("scan-status").textContent = "Interface locked — ready to scan";
+    addLog("success", `Interface locked: ${iface}`);
+    syncLaunchBtn();
+  } else {
+    addLog("error", data.msg);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SCAN
+// ═══════════════════════════════════════════════════════════════
+async function startScan() {
+  if (!ifaceLocked) { addLog("error","Lock interface first"); return; }
+  selectedTargets = [];
+  renderSelSummary();
+  await fetch("/api/scan", {method:"POST"});
+}
+
+function stopScan() {
+  addLog("warn","Stop requested — finishing current pass");
+  document.getElementById("stop-scan").disabled = true;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TARGETS — multi-select
+// ═══════════════════════════════════════════════════════════════
+function renderTargets(targets) {
+  const el = document.getElementById("tgt-list");
+  if (!targets.length) {
+    el.innerHTML = `<div class="empty-hint"><div class="ei">🖧</div>
+      No hosts found.<br>Check interface and subnet.</div>`;
+    return;
+  }
+  el.innerHTML = targets.map(t => `
+    <div class="tgt-item" onclick="toggleTarget(event,'${t.ip}','${t.mac}','${esc(t.hostname||'')}')"
+         id="tgt-${t.ip.replace(/\./g,'-')}">
+      <div class="tgt-ip">${t.ip}</div>
+      <div class="tgt-mac">${t.mac}</div>
+      ${t.hostname ? `<div class="tgt-host">${t.hostname}</div>` : ""}
+      <span class="sel-check">✓</span>
+    </div>`).join("");
+}
+
+function toggleTarget(ev, ip, mac, hostname) {
+  const multi = ev.ctrlKey || ev.metaKey || ev.shiftKey;
+  if (!multi) {
+    // single-click: clear others, toggle this one
+    const alreadySel = selectedTargets.some(t => t.ip === ip);
+    selectedTargets  = [];
+    if (!alreadySel) selectedTargets.push({ip, mac, hostname});
+  } else {
+    // ctrl/meta/shift: add or remove this one
+    const idx = selectedTargets.findIndex(t => t.ip === ip);
+    if (idx >= 0) selectedTargets.splice(idx, 1);
+    else selectedTargets.push({ip, mac, hostname});
+  }
+  // Update visual
+  document.querySelectorAll(".tgt-item").forEach(el => {
+    const elIp = el.querySelector(".tgt-ip").textContent;
+    el.classList.toggle("sel", selectedTargets.some(t => t.ip === elIp));
+  });
+  renderSelSummary();
+  syncLaunchBtn();
+  if (selectedAttack) updateTray();
+}
+
+function renderSelSummary() {
+  const el = document.getElementById("sel-summary");
+  if (!selectedTargets.length) { el.textContent = ""; return; }
+  el.textContent = `${selectedTargets.length} target(s) selected: ${selectedTargets.map(t=>t.ip).join(", ")}`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ATTACK GRID
+// ═══════════════════════════════════════════════════════════════
+function buildGrid() {
+  const grid = document.getElementById("atk-grid");
+  const list = currentCat === "all" ? ATTACKS : ATTACKS.filter(a => a.cat === currentCat);
+  grid.innerHTML = list.map(a => `
+    <div class="acard${selectedAttack===a.id?' active':''}" id="card-${a.id}"
+         onclick="selectAtk('${a.id}')">
+      <div class="aicon">${a.icon}</div>
+      <div class="aname">${a.name}</div>
+      <div class="acat">${a.cat.toUpperCase()}</div>
+    </div>`).join("");
+}
+
+function filterCat(btn, cat) {
+  currentCat = cat;
+  document.querySelectorAll(".ctab").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  buildGrid();
+}
+
+function selectAtk(id) {
+  selectedAttack = id;
+  document.querySelectorAll(".acard").forEach(c => c.classList.remove("active"));
+  const card = document.getElementById(`card-${id}`);
+  if (card) card.classList.add("active");
+  renderCfg(id);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CONFIG FORM
+// ═══════════════════════════════════════════════════════════════
+function renderCfg(id) {
+  const atk = ATTACKS.find(a => a.id === id);
+  if (!atk) return;
+
+  const fields = atk.fields.map(f => {
+    if (f.type === "select") {
+      return `<div class="fg"><label>${f.label}</label>
+        <select id="f-${f.id}">${f.opts.map(o=>`<option>${o}</option>`).join("")}</select>
+      </div>`;
+    }
+    return `<div class="fg"><label>${f.label}</label>
+      <input type="text" id="f-${f.id}" placeholder="${f.ph||''}" value="${f.ph||''}">
+      ${f.hint?`<div class="hint">${f.hint}</div>`:""}
+    </div>`;
+  }).join("");
+
+  document.getElementById("cfg").innerHTML = `
+    <div class="cfg-title">${atk.icon} ${atk.name}</div>
+    <div class="cfg-desc">${atk.desc}</div>
+
+    <div class="tgt-tray">
+      <div class="tray-label">🎯 Selected Targets</div>
+      <div class="tray-chips" id="tray-chips"></div>
+    </div>
+
+    ${fields}
+
+    <div class="fg">
+      <label>Primary Wireshark Filter</label>
+      <input type="text" id="ws-preview" value="${atk.filter}" readonly
+             style="color:var(--accent2);cursor:text">
+      ${atk.wireshark_extra ? `
+      <div class="hint" style="margin-top:5px">
+        <span style="color:var(--text3)">Additional / context filter:</span><br>
+        <span style="color:var(--accent2);font-family:'JetBrains Mono',monospace;font-size:10px">${atk.wireshark_extra}</span>
+      </div>` : ""}
+    </div>
+
+    <div class="action-row">
+      <button id="launch-btn" onclick="launchAtk()">⚡ Launch Attack</button>
+      <button id="stop-atk"  onclick="stopAtk()">■ Stop</button>
+    </div>
+
+    <div class="pcap-box" id="pcap-box">
+      <div class="plabel">📁 PCAP</div>
+      <div class="ppath" id="pcap-path">—</div>
+      <div class="plabel" style="margin-top:7px">🔬 Wireshark Command</div>
+      <div class="ws-cmd" id="ws-cmd-text">—</div>
+    </div>`;
+
+  updateTray();
+  syncLaunchBtn();
+}
+
+function updateTray() {
+  const chips = document.getElementById("tray-chips");
+  if (!chips) return;
+  if (!selectedTargets.length) {
+    chips.innerHTML = `<span class="tray-empty">⚠ No targets selected — click hosts on the left</span>`;
+    return;
+  }
+  chips.innerHTML = selectedTargets.map(t => `
+    <span class="chip">
+      ${t.ip}
+      <span class="chip-rm" onclick="removeTarget('${t.ip}')">×</span>
+    </span>`).join("");
+}
+
+function removeTarget(ip) {
+  selectedTargets = selectedTargets.filter(t => t.ip !== ip);
+  const el = document.getElementById(`tgt-${ip.replace(/\./g,'-')}`);
+  if (el) el.classList.remove("sel");
+  renderSelSummary();
+  updateTray();
+  syncLaunchBtn();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  LAUNCH BUTTON — the fix
+//  Conditions: interface locked AND ≥1 target AND no scan running AND no attack running
+// ═══════════════════════════════════════════════════════════════
+function syncLaunchBtn() {
+  const lb = document.getElementById("launch-btn");
+  const sb = document.getElementById("stop-atk");
+  if (lb) lb.disabled = !(ifaceLocked && selectedTargets.length > 0 && !scanRunning && !atkRunning);
+  if (sb) sb.disabled = !atkRunning;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  LAUNCH / STOP
+// ═══════════════════════════════════════════════════════════════
+async function launchAtk() {
+  if (!selectedAttack || !selectedTargets.length) return;
+  const atk = ATTACKS.find(a => a.id === selectedAttack);
+  if (!atk) return;
+
+  // Build params — use first selected target as primary target_ip
+  // For multi-target, we pass all IPs; backend uses first, module can iterate
+  const params = {
+    target_ip:   selectedTargets[0].ip,
+    target_ips:  selectedTargets.map(t => t.ip),
+    target_macs: selectedTargets.map(t => t.mac),
+  };
+
+  atk.fields.forEach(f => {
+    const el = document.getElementById(`f-${f.id}`);
+    if (el) params[f.id] = el.value;
+  });
+
+  // Special overrides
+  if (atk.id === "dns_exfil" && params.target_ip_override) {
+    params.target_ip = params.target_ip_override;
+  }
+
+  const res  = await fetch("/api/attack/start", {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({attack: selectedAttack, params})
+  });
+  const data = await res.json();
+  if (!data.ok) addLog("error", data.msg);
+}
+
+async function stopAtk() {
+  await fetch("/api/attack/stop", {method:"POST"});
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  LOG
+// ═══════════════════════════════════════════════════════════════
+function addLog(level, msg, ts) {
+  const body = document.getElementById("log-body");
+  const time = ts || new Date().toTimeString().slice(0,8);
+  const line = document.createElement("div");
+  line.className    = `ll ${level}`;
+  line.dataset.level = level;
+  line.innerHTML    = `<span class="lts">${time}</span><span class="lm">${esc(String(msg))}</span>`;
+  if (logFilter !== "all" && level !== logFilter) line.style.display = "none";
+  if (level === "error") document.getElementById("log-dot").className = "dot r";
+  body.appendChild(line);
+  body.scrollTop = body.scrollHeight;
+}
+
+function setLF(btn, filter) {
+  logFilter = filter;
+  document.querySelectorAll(".lf-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  document.querySelectorAll(".ll").forEach(el => {
+    el.style.display = (filter==="all" || el.dataset.level===filter) ? "" : "none";
+  });
+}
+
+function clearLog() { document.getElementById("log-body").innerHTML = ""; }
+
+// ═══════════════════════════════════════════════════════════════
+//  PCAP LIST
+// ═══════════════════════════════════════════════════════════════
+async function loadPcaps() {
+  const res   = await fetch("/api/pcaps");
+  const files = await res.json();
+  const el    = document.getElementById("pcap-list");
+  el.innerHTML = files.length
+    ? files.map(f => `<div class="pcap-file">pcap_analysis/${f}</div>`).join("")
+    : `<p style="color:var(--text3);font-size:11px">No captures yet.</p>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MODALS
+// ═══════════════════════════════════════════════════════════════
+function openModal(id) {
+  if (id === "pcap-modal") loadPcaps();
+  document.getElementById(id).classList.add("show");
+}
+function closeModal(id) { document.getElementById(id).classList.remove("show"); }
+
+document.querySelectorAll(".ov").forEach(m =>
+  m.addEventListener("click", e => { if (e.target===m) m.classList.remove("show"); })
+);
+
+// ═══════════════════════════════════════════════════════════════
+//  THEME
+// ═══════════════════════════════════════════════════════════════
+function toggleTheme() {
+  const dark = document.documentElement.getAttribute("data-theme") === "dark";
+  document.documentElement.setAttribute("data-theme", dark ? "light" : "dark");
+  document.getElementById("theme-btn").textContent = dark ? "☀️" : "🌙";
+  localStorage.setItem("soc-theme", dark ? "light" : "dark");
+}
+document.getElementById("theme-btn").addEventListener("click", toggleTheme);
+const saved = localStorage.getItem("soc-theme");
+if (saved) {
+  document.documentElement.setAttribute("data-theme", saved);
+  document.getElementById("theme-btn").textContent = saved==="dark" ? "🌙" : "☀️";
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════════════════════════
+function esc(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
+document.getElementById("lock-btn").addEventListener("click", lockIface);
+loadIfaces();
+buildGrid();
+addLog("system","SOC Lab v2.0 ready — select and lock an interface to begin");
+</script>
+</body>
+</html>

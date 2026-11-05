@@ -227,7 +227,8 @@ NetSentinel/
 
 ```bash
 sudo apt update
-sudo apt install python3 python3-pip wireshark nmap libpcap-dev  -y
+sudo apt install python3 python3-pip python3-venv \
+                 wireshark libpcap-dev nmap -y
 
 # Allow your user to open PCAP files in Wireshark without sudo
 sudo usermod -aG wireshark $USER
@@ -237,22 +238,25 @@ sudo usermod -aG wireshark $USER
 
 ```bash
 git clone https://github.com/1024Cyber/SOCBench.git
-cd SOCBench
+cd NetSentinel
 
-sudo pip install -r requirements.txt
+python3 -m venv venv
+source venv/bin/activate
+
+pip install -r requirements.txt
 ```
 
 ### 3 — Run
 
 ```bash
 # Raw socket access requires root
-sudo python3 app.py
+sudo venv/bin/python3 app.py
 ```
 
 ### 4 — Open in browser
 
 ```
-http://127.0.0.1:4586
+http://127.0.0.1:5000
 ```
 
 ---
@@ -363,12 +367,17 @@ pip install --upgrade scapy
 
 ## ⚠ Disclaimer
 
-SOCBench is designed exclusively for **authorized lab environments, controlled training exercises, and educational purposes**.
+NetSentinel is designed exclusively for **authorized lab environments, controlled training exercises, and educational purposes**.
 
 - Do not use against networks you do not own
 - Do not use without explicit written permission from the network owner
 - The authors accept no liability for misuse
-- Email me on: <a href="mailto:you@inocent.py@yahoo.com">inocent.py@yahoo.com</a>
+
+---
+
+## License
+
+MIT License — see [LICENSE](LICENSE) for details.
 
 ---
 
@@ -377,6 +386,6 @@ SOCBench is designed exclusively for **authorized lab environments, controlled t
 Made for the blue team. Built to think like the red team.
 
 For access to the complete source-code of this project, reach out to me on Telegram:
-https://t.me/xn0r1
+t.me/CyberSenal_bot
 
 </div>
